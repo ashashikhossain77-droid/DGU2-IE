@@ -20,11 +20,13 @@ import {
   Layers,
   Factory,
   KeyRound,
+  Eye,
+  EyeOff,
   Radio,
   Clock
 } from 'lucide-react';
 import { UserProfile, RoleTier } from '../types';
-import { SYSTEM_ADMIN_EMAIL } from '../utils/rbac';
+import { SYSTEM_ADMIN_EMAIL, verifySystemAdminPasscode } from '../utils/rbac';
 import { SYSTEM_ADMIN_PROFILE, ROLE_TIERS } from '../mockData';
 import { googleSignIn, googleSignOut } from '../lib/firebaseAuth';
 
@@ -44,11 +46,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   roleTiers = ROLE_TIERS
 }) => {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState(currentProfile?.name || '');
   const [employeeId, setEmployeeId] = useState(currentProfile?.employeeId || 'IE-9042');
   const [phoneNumber, setPhoneNumber] = useState(currentProfile?.phoneNumber || '');
   const [selectedTier, setSelectedTier] = useState<string>('tier_3'); // Line In-Charge / IE
   const [selectedWing, setSelectedWing] = useState<'Blue Wing' | 'Green Wing' | 'All'>('Blue Wing');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [unauthorizedDomain, setUnauthorizedDomain] = useState(false);
@@ -135,10 +139,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setFullName('MD Ashikur Rahman');
     setEmployeeId('12455');
     setPhoneNumber('+8801644440971');
+    setPassword('911999');
     setErrorMsg(null);
   };
 
-  // Direct Credential Authentication
+  // Direct Credential / Floor Passcode Authentication
   const handleEmailPasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -148,8 +153,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                         employeeId.trim() === '12455' || 
                         cleanEmail.startsWith('ashikur.rahman');
     
-    // Check if user is attempting Root Admin login or matches Core Admin credentials
+    // Check if user is attempting Root Admin login
     if (isCoreAdmin) {
+      if (password.trim() && !verifySystemAdminPasscode(password.trim())) {
+        setErrorMsg('Invalid Master Passcode. Please enter 911999 or use the Core Admin button.');
+        return;
+      }
       const adminProfile: UserProfile = {
         ...SYSTEM_ADMIN_PROFILE,
         name: fullName.trim() || 'MD Ashikur Rahman',
@@ -416,6 +425,34 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#d9d2c2] bg-white text-xs text-[#17343a] focus:outline-hidden focus:border-[#176f78] transition-colors font-mono"
                   />
                   <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-[#17343a] block">
+                    Password / Master Passcode
+                  </label>
+                  <span className="text-[10px] text-[#527078] font-mono">
+                    Admin Passcode: <span className="font-bold text-amber-800">911999</span>
+                  </span>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="Floor PIN or Master Passcode (911999)"
+                    className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-[#d9d2c2] bg-white text-xs text-[#17343a] focus:outline-hidden focus:border-[#176f78] transition-colors font-mono"
+                  />
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 

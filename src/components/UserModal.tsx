@@ -344,12 +344,12 @@ export const UserModal: React.FC<UserModalProps> = ({
               <form onSubmit={handleVerifyAndElevateAdmin} className="flex items-center gap-2 w-full sm:w-auto">
                 <input
                   type="password"
-                  maxLength={32}
+                  maxLength={6}
                   autoFocus
                   placeholder="Passcode"
                   value={adminPassInput}
                   onChange={e => setAdminPassInput(e.target.value)}
-                  className="flex-1 sm:w-36 px-3 py-1.5 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/40 font-mono text-center tracking-widest text-xs focus:outline-hidden focus:border-amber-400"
+                  className="flex-1 sm:w-28 px-3 py-1.5 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/40 font-mono text-center tracking-widest text-xs focus:outline-hidden focus:border-amber-400"
                 />
                 <button
                   type="submit"
