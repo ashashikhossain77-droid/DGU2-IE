@@ -45,6 +45,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   currentProfile,
   roleTiers = ROLE_TIERS
 }) => {
+  const [authMode, setAuthMode] = useState<'signin' | 'quick_role' | 'admin_pin'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState(currentProfile?.name || '');
@@ -52,12 +53,35 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [phoneNumber, setPhoneNumber] = useState(currentProfile?.phoneNumber || '');
   const [selectedTier, setSelectedTier] = useState<string>('tier_3'); // Line In-Charge / IE
   const [selectedWing, setSelectedWing] = useState<'Blue Wing' | 'Green Wing' | 'All'>('Blue Wing');
+  const [adminPin, setAdminPin] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [unauthorizedDomain, setUnauthorizedDomain] = useState(false);
 
   if (!isOpen) return null;
+
+  // Preset role tier quick login handlers
+  const handleQuickRoleSelect = (tierId: string) => {
+    setSelectedTier(tierId);
+    if (tierId === 'tier_1') {
+      setFullName('Sr. IE Manager');
+      setEmail('ie.manager@debonairgroup.com');
+      setSelectedWing('All');
+    } else if (tierId === 'tier_2') {
+      setFullName('Wing Production Manager');
+      setEmail('wing.manager@debonairgroup.com');
+      setSelectedWing('Blue Wing');
+    } else if (tierId === 'tier_3') {
+      setFullName('IE In-Charge');
+      setEmail('ie.incharge@debonairgroup.com');
+      setSelectedWing('Blue Wing');
+    } else if (tierId === 'tier_4') {
+      setFullName('Line Industrial Engineer');
+      setEmail('line.ie@debonairgroup.com');
+      setSelectedWing('Blue Wing');
+    }
+  };
 
   // Google OAuth SSO Sign-in
   const handleGoogleSSO = async () => {
@@ -78,8 +102,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           email: userEmail,
           photoURL: u.photoURL || (isSysAdmin ? SYSTEM_ADMIN_PROFILE.photoURL : undefined),
           googleUid: u.uid,
-          employeeId: isSysAdmin ? (SYSTEM_ADMIN_PROFILE.employeeId || '12455') : (employeeId || 'IE-9042'),
-          phoneNumber: isSysAdmin ? (SYSTEM_ADMIN_PROFILE.phoneNumber || '+8801644440971') : (phoneNumber.trim() || currentProfile?.phoneNumber || undefined),
+          employeeId: employeeId || 'IE-9042',
+          phoneNumber: phoneNumber.trim() || currentProfile?.phoneNumber || undefined,
           role: isSysAdmin ? 'admin' : (selectedTier === 'tier_1' ? 'sr_manager' : selectedTier === 'tier_2' ? 'manager' : selectedTier === 'tier_3' ? 'ie_incharge' : 'line_ie'),
           tierId: isSysAdmin ? 'tier_0' : selectedTier,
           jobTitle: isSysAdmin ? 'System Administrator (Root Operations)' : (roleTiers.find(t => t.id === selectedTier)?.roleTitle || 'Industrial Engineer'),
@@ -111,67 +135,22 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     }
   };
 
-  // Immediate 1-Click Core Admin Sign-In
-  const handleCoreAdminSignIn = () => {
-    const adminProfile: UserProfile = {
-      ...SYSTEM_ADMIN_PROFILE,
-      name: 'MD Ashikur Rahman',
-      email: SYSTEM_ADMIN_EMAIL,
-      employeeId: '12455',
-      phoneNumber: '+8801644440971',
-      jobTitle: 'System Administrator (Root Operations)',
-      role: 'admin',
-      tierId: 'tier_0',
-      assignedUnit: 'Debonair LTD (Unit-02) — Master Administration',
-      shift: '24/7 Root Operations & System Control',
-      assignedWing: 'All',
-      photoURL: 'https://api.dicebear.com/7.x/initials/svg?seed=MD%20Ashikur%20Rahman&backgroundColor=176f78'
-    };
-    try {
-      localStorage.setItem('ie_user_profile', JSON.stringify(adminProfile));
-    } catch {}
-    onSuccess(adminProfile);
-  };
-
-  // Pre-fill form with Core Admin details
-  const handleFillCoreAdmin = () => {
-    setEmail('ashikur.rahman.0971@gmail.com');
-    setFullName('MD Ashikur Rahman');
-    setEmployeeId('12455');
-    setPhoneNumber('+8801644440971');
-    setPassword('911999');
-    setErrorMsg(null);
-  };
-
   // Direct Credential / Floor Passcode Authentication
   const handleEmailPasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
     const cleanEmail = email.trim().toLowerCase();
-    const isCoreAdmin = cleanEmail === SYSTEM_ADMIN_EMAIL.toLowerCase() || 
-                        employeeId.trim() === '12455' || 
-                        cleanEmail.startsWith('ashikur.rahman');
     
     // Check if user is attempting Root Admin login
-    if (isCoreAdmin) {
-      if (password.trim() && !verifySystemAdminPasscode(password.trim())) {
-        setErrorMsg('Invalid Master Passcode. Please enter 911999 or use the Core Admin button.');
+    if (cleanEmail === SYSTEM_ADMIN_EMAIL.toLowerCase()) {
+      if (!verifySystemAdminPasscode(password.trim() || adminPin.trim())) {
+        setErrorMsg('Invalid System Administrator credentials or passcode.');
         return;
       }
-      const adminProfile: UserProfile = {
+      const adminProfile = {
         ...SYSTEM_ADMIN_PROFILE,
-        name: fullName.trim() || 'MD Ashikur Rahman',
-        email: SYSTEM_ADMIN_EMAIL,
-        employeeId: employeeId.trim() || '12455',
-        phoneNumber: phoneNumber.trim() || '+8801644440971',
-        jobTitle: 'System Administrator (Root Operations)',
-        role: 'admin',
-        tierId: 'tier_0',
-        assignedUnit: 'Debonair LTD (Unit-02) — Master Administration',
-        shift: '24/7 Root Operations & System Control',
-        assignedWing: 'All',
-        photoURL: 'https://api.dicebear.com/7.x/initials/svg?seed=MD%20Ashikur%20Rahman&backgroundColor=176f78'
+        assignedUnit: 'Debonair LTD (Unit-02) — Master Administration'
       };
       try {
         localStorage.setItem('ie_user_profile', JSON.stringify(adminProfile));
@@ -181,7 +160,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     }
 
     if (!cleanEmail) {
-      setErrorMsg('Please provide a valid employee email or login ID.');
+      setErrorMsg('Please provide a valid employee email or username.');
       return;
     }
 
@@ -209,6 +188,24 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     onSuccess(newProfile);
   };
 
+  // Master Admin Terminal Passcode Form
+  const handleAdminPinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (verifySystemAdminPasscode(adminPin.trim())) {
+      const adminProfile = {
+        ...SYSTEM_ADMIN_PROFILE,
+        assignedUnit: 'Debonair LTD (Unit-02) — Master Administration'
+      };
+      try {
+        localStorage.setItem('ie_user_profile', JSON.stringify(adminProfile));
+      } catch {}
+      onSuccess(adminProfile);
+    } else {
+      setErrorMsg('Invalid System Master Passcode.');
+      setTimeout(() => setErrorMsg(null), 3000);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 select-none animate-in fade-in duration-200">
       <div className="relative w-full max-w-xl bg-[#faf8f4] border border-[#d9d2c2] rounded-3xl shadow-2xl overflow-hidden flex flex-col">
@@ -234,15 +231,33 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           </div>
         </div>
 
-        {/* Sub Header */}
-        <div className="px-6 py-2.5 border-b border-[#e7e1d5] bg-white flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-bold text-[#17343a]">
-            <KeyRound className="w-3.5 h-3.5 text-[#176f78]" />
-            <span>Floor Cockpit &amp; Master Admin Sign In</span>
-          </div>
-          <span className="text-[10px] font-mono font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
-            Debonair Unit 02
-          </span>
+        {/* Tab Selection: Operational Login vs Quick Role Switching vs Admin PIN */}
+        <div className="px-6 pt-3 pb-1 border-b border-[#e7e1d5] bg-white flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+          <button
+            type="button"
+            onClick={() => setAuthMode('signin')}
+            className={`px-3 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+              authMode === 'signin'
+                ? 'bg-[#176f78] text-white shadow-2xs'
+                : 'text-[#506e75] hover:bg-[#f1eee6]'
+            }`}
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            <span>Sign In / SSO</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAuthMode('admin_pin')}
+            className={`px-3 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ml-auto ${
+              authMode === 'admin_pin'
+                ? 'bg-amber-500 text-teal-950 shadow-2xs font-black'
+                : 'text-amber-800 hover:bg-amber-50'
+            }`}
+          >
+            <Lock className="w-3.5 h-3.5 text-amber-600" />
+            <span>Admin Passcode</span>
+          </button>
         </div>
 
         {/* Content Body */}
@@ -254,217 +269,309 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             </div>
           )}
 
-          <div className="space-y-5">
-            {/* Google OAuth 2.0 / Firebase SSO Button */}
-            <button
-              type="button"
-              onClick={handleGoogleSSO}
-              disabled={isLoading}
-              className="w-full py-3 px-4 rounded-2xl border border-[#d9d2c2] bg-white hover:bg-[#f5f3ec] text-[#17343a] text-sm font-bold shadow-xs hover:shadow-sm transition-all flex items-center justify-center gap-3 cursor-pointer touch-manipulation active:scale-[0.99]"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.14z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.36 24 12 24z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.36 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                />
-              </svg>
-              <span>Continue with Google Workspace</span>
-            </button>
+          {/* Mode 1: Primary Sign-in & Google SSO */}
+          {authMode === 'signin' && (
+            <div className="space-y-5">
+              {/* Google OAuth 2.0 / Firebase SSO Button */}
+              <button
+                type="button"
+                onClick={handleGoogleSSO}
+                disabled={isLoading}
+                className="w-full py-3 px-4 rounded-2xl border border-[#d9d2c2] bg-white hover:bg-[#f5f3ec] text-[#17343a] text-sm font-bold shadow-xs hover:shadow-sm transition-all flex items-center justify-center gap-3 cursor-pointer touch-manipulation active:scale-[0.99]"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.14z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.36 24 12 24z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.36 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                  />
+                </svg>
+                <span>Continue with Google Workspace</span>
+              </button>
 
-            {unauthorizedDomain && (
-              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-400/40 text-amber-900 text-xs space-y-2">
-                <div className="font-bold flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-amber-600" />
-                  <span>Quick Local Sign-In Available</span>
+              {unauthorizedDomain && (
+                <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-400/40 text-amber-900 text-xs space-y-2">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-amber-600" />
+                    <span>Quick Local Sign-In Available</span>
+                  </div>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    Browser domain authorization notice detected. You can instantly sign in using the floor credentials below or click below to authorize as Lead IE:
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const demoProfile: UserProfile = {
+                        ...(currentProfile || {}),
+                        name: 'Ashik Hossain (IE)',
+                        email: 'ashikhossainkr@gmail.com',
+                        jobTitle: 'IE Executive (Sewing Floor)',
+                        role: 'ie_incharge',
+                        tierId: 'tier_3',
+                        assignedUnit: 'Unit 02 (Sewing Floor)',
+                        assignedWing: 'Blue Wing',
+                        shift: 'General Shift (8:00 AM - 5:00 PM)',
+                        photoURL: 'https://api.dicebear.com/7.x/initials/svg?seed=Ashik%20Hossain&backgroundColor=176f78'
+                      };
+                      try {
+                        localStorage.setItem('ie_user_profile', JSON.stringify(demoProfile));
+                      } catch {}
+                      onSuccess(demoProfile);
+                    }}
+                    className="w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-teal-950 font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    Authorize as Ashik Hossain (IE Executive)
+                  </button>
                 </div>
-                <p className="text-[11px] text-amber-800 leading-relaxed">
-                  Browser domain authorization notice detected. You can instantly sign in using the floor credentials below or click below to authorize as Core Admin:
-                </p>
+              )}
+
+              <div className="relative flex items-center justify-center">
+                <div className="border-t border-[#d9d2c2] w-full" />
+                <span className="bg-[#faf8f4] px-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  Or Sign In with Employee ID
+                </span>
+                <div className="border-t border-[#d9d2c2] w-full" />
+              </div>
+
+              {/* Email / ID + Password Form */}
+              <form onSubmit={handleEmailPasswordSubmit} className="space-y-3.5">
+                <div>
+                  <label className="text-xs font-bold text-[#17343a] block mb-1">
+                    Employee Email / Login ID
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      placeholder="e.g. ashik.ie@debonairgroup.com"
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#d9d2c2] bg-white text-xs text-[#17343a] focus:outline-hidden focus:border-[#176f78] transition-colors"
+                    />
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-[#17343a] block mb-1">
+                    Employee Name
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={fullName}
+                      onChange={e => setFullName(e.target.value)}
+                      placeholder="e.g. Ashik Hossain"
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#d9d2c2] bg-white text-xs text-[#17343a] focus:outline-hidden focus:border-[#176f78] transition-colors"
+                    />
+                    <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-[#17343a] block mb-1">
+                    Employee ID
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={employeeId}
+                      onChange={e => setEmployeeId(e.target.value)}
+                      placeholder="e.g. IE-9042"
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#d9d2c2] bg-white text-xs text-[#17343a] focus:outline-hidden focus:border-[#176f78] transition-colors font-mono uppercase"
+                    />
+                    <BadgeCheck className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-[#17343a] block mb-1">
+                    Employee Phone Number
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="tel"
+                      value={phoneNumber}
+                      onChange={e => setPhoneNumber(e.target.value)}
+                      placeholder="e.g. +880 1712-345678"
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#d9d2c2] bg-white text-xs text-[#17343a] focus:outline-hidden focus:border-[#176f78] transition-colors font-mono"
+                    />
+                    <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 rounded-2xl bg-[#176f78] hover:bg-[#125860] text-white text-xs font-bold uppercase tracking-wider shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all touch-manipulation active:scale-[0.98] mt-2"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Authenticate &amp; Enter Floor Cockpit</span>
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Mode 2: Quick Role Switching for Multi-Tier Plant Demonstrations */}
+          {authMode === 'quick_role' && (
+            <div className="space-y-4">
+              <p className="text-xs text-[#476369] leading-relaxed">
+                Select an operational role tier to immediately configure user scopes, line balancing permissions, and department visibility:
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Tier 1 */}
                 <button
                   type="button"
-                  onClick={handleCoreAdminSignIn}
-                  className="w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-teal-950 font-bold text-xs transition-colors cursor-pointer"
+                  onClick={() => handleQuickRoleSelect('tier_1')}
+                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                    selectedTier === 'tier_1'
+                      ? 'border-[#176f78] bg-[#dceceb]/50 ring-2 ring-[#176f78]/30 shadow-2xs'
+                      : 'border-[#d9d2c2] bg-white hover:bg-[#f1eee6]'
+                  }`}
                 >
-                  Authorize as MD Ashikur Rahman (Core Admin)
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-black text-[#17343a]">Tier 1: Sr. Manager</span>
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">
+                      Plant Wide
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600">
+                    Full oversight across all 24 lines, learning curve approvals &amp; export signing.
+                  </p>
+                </button>
+
+                {/* Tier 2 */}
+                <button
+                  type="button"
+                  onClick={() => handleQuickRoleSelect('tier_2')}
+                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                    selectedTier === 'tier_2'
+                      ? 'border-[#176f78] bg-[#dceceb]/50 ring-2 ring-[#176f78]/30 shadow-2xs'
+                      : 'border-[#d9d2c2] bg-white hover:bg-[#f1eee6]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-black text-[#17343a]">Tier 2: Production Mgr</span>
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                      Wing Control
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600">
+                    Authority over assigned wing (Blue/Green), hourly target adjustments &amp; bottleneck routing.
+                  </p>
+                </button>
+
+                {/* Tier 3 */}
+                <button
+                  type="button"
+                  onClick={() => handleQuickRoleSelect('tier_3')}
+                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                    selectedTier === 'tier_3'
+                      ? 'border-[#176f78] bg-[#dceceb]/50 ring-2 ring-[#176f78]/30 shadow-2xs'
+                      : 'border-[#d9d2c2] bg-white hover:bg-[#f1eee6]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-black text-[#17343a]">Tier 3: IE In-Charge</span>
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-800">
+                      Line Group
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600">
+                    Manpower balancing, SAM calculations, skill matrix allocation &amp; morning huddles.
+                  </p>
+                </button>
+
+                {/* Tier 4 */}
+                <button
+                  type="button"
+                  onClick={() => handleQuickRoleSelect('tier_4')}
+                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                    selectedTier === 'tier_4'
+                      ? 'border-[#176f78] bg-[#dceceb]/50 ring-2 ring-[#176f78]/30 shadow-2xs'
+                      : 'border-[#d9d2c2] bg-white hover:bg-[#f1eee6]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-black text-[#17343a]">Tier 4: Line IE</span>
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                      Workstation
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600">
+                    Cycle time telemetry capture, pitch diagram updates &amp; WIP monitoring.
+                  </p>
                 </button>
               </div>
-            )}
 
-            {/* Core Administrator Elevation & Quick Sign-In Card */}
-            <div className="p-3.5 rounded-2xl bg-[#fdf9f0] border border-amber-300 shadow-2xs space-y-2.5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-amber-500 text-teal-950 flex items-center justify-center font-black shadow-xs shrink-0">
-                    <ShieldCheck className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-black text-xs text-[#17343a]">Core Administrator</span>
-                      <span className="font-mono text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-200 text-amber-950">
-                        Tier 0 Root
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-[#426168] font-medium">
-                      MD Ashikur Rahman &bull; ID: <span className="font-mono font-bold text-teal-900">12455</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={handleFillCoreAdmin}
-                    className="px-2.5 py-1.5 rounded-xl border border-amber-300 bg-white hover:bg-amber-50 text-amber-900 font-bold text-[11px] transition-all cursor-pointer touch-manipulation"
-                    title="Auto-fill Core Admin credentials into the form below"
-                  >
-                    Fill Form
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCoreAdminSignIn}
-                    className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-teal-950 font-black text-xs transition-all shadow-xs flex items-center gap-1.5 cursor-pointer touch-manipulation active:scale-[0.98]"
-                  >
-                    <Lock className="w-3.5 h-3.5" />
-                    <span>Sign In as Core Admin</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] text-[#4a6b72] pt-2 border-t border-amber-200/60">
-                <div className="flex items-center gap-1">
-                  <span className="font-bold text-slate-700">Email/Login ID:</span>
-                  <span className="font-mono text-amber-900 select-all font-semibold">ashikur.rahman.0971@gmail.com</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="font-bold text-slate-700">Phone:</span>
-                  <span className="font-mono text-amber-900 font-semibold">+8801644440971</span>
-                </div>
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleEmailPasswordSubmit}
+                  className="w-full py-3 rounded-2xl bg-[#176f78] hover:bg-[#125860] text-white text-xs font-bold uppercase tracking-wider shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all touch-manipulation active:scale-[0.98]"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Confirm &amp; Load Tier Role</span>
+                </button>
               </div>
             </div>
+          )}
 
-            <div className="relative flex items-center justify-center">
-              <div className="border-t border-[#d9d2c2] w-full" />
-              <span className="bg-[#faf8f4] px-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Or Sign In with Employee Credentials
-              </span>
-              <div className="border-t border-[#d9d2c2] w-full" />
-            </div>
-
-            {/* Email / ID + Password Form */}
-            <form onSubmit={handleEmailPasswordSubmit} className="space-y-3.5">
-              <div>
-                <label className="text-xs font-bold text-[#17343a] block mb-1">
-                  Employee Email / Login ID
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="e.g. ashikur.rahman.0971@gmail.com"
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#d9d2c2] bg-white text-xs text-[#17343a] focus:outline-hidden focus:border-[#176f78] transition-colors"
-                  />
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-[#17343a] block mb-1">
-                  Employee Name
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={fullName}
-                    onChange={e => setFullName(e.target.value)}
-                    placeholder="e.g. MD Ashikur Rahman"
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#d9d2c2] bg-white text-xs text-[#17343a] focus:outline-hidden focus:border-[#176f78] transition-colors"
-                  />
-                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-[#17343a] block mb-1">
-                  Employee ID
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={employeeId}
-                    onChange={e => setEmployeeId(e.target.value)}
-                    placeholder="e.g. 12455"
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#d9d2c2] bg-white text-xs text-[#17343a] focus:outline-hidden focus:border-[#176f78] transition-colors font-mono uppercase"
-                  />
-                  <BadgeCheck className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-[#17343a] block mb-1">
-                  Employee Phone Number
-                </label>
-                <div className="relative">
-                  <input
-                    type="tel"
-                    value={phoneNumber}
-                    onChange={e => setPhoneNumber(e.target.value)}
-                    placeholder="e.g. +8801644440971"
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-[#d9d2c2] bg-white text-xs text-[#17343a] focus:outline-hidden focus:border-[#176f78] transition-colors font-mono"
-                  />
-                  <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-[#17343a] block">
-                    Password / Master Passcode
-                  </label>
-                  <span className="text-[10px] text-[#527078] font-mono">
-                    Admin Passcode: <span className="font-bold text-amber-800">911999</span>
+          {/* Mode 3: Master Admin Passcode */}
+          {authMode === 'admin_pin' && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-400/40 text-amber-950 text-xs space-y-2">
+                <div className="font-bold flex items-center justify-between text-amber-900">
+                  <div className="flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-amber-600" />
+                    <span>Master Administrator Elevation</span>
+                  </div>
+                  <span className="font-mono text-[10px] bg-amber-200 text-amber-950 px-2 py-0.5 rounded-md font-bold">
+                    Tier 0 Root
                   </span>
                 </div>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="Floor PIN or Master Passcode (911999)"
-                    className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-[#d9d2c2] bg-white text-xs text-[#17343a] focus:outline-hidden focus:border-[#176f78] transition-colors font-mono"
-                  />
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  Master System Administrator root authorization is exclusively assigned to{' '}
+                  <span className="font-mono font-bold text-amber-950 underline">{SYSTEM_ADMIN_EMAIL}</span> (Ashikur Rahman). Enter the root security key to authorize this terminal session.
+                </p>
               </div>
 
-              <button
-                type="submit"
-                className="w-full py-3 rounded-2xl bg-[#176f78] hover:bg-[#125860] text-white text-xs font-bold uppercase tracking-wider shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all touch-manipulation active:scale-[0.98] mt-2"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Authenticate &amp; Enter Floor Cockpit</span>
-              </button>
-            </form>
-          </div>
+              <form onSubmit={handleAdminPinSubmit} className="space-y-3">
+                <div>
+                  <label className="text-xs font-bold text-[#17343a] block mb-1">
+                    Root Master Passcode
+                  </label>
+                  <input
+                    type="password"
+                    autoFocus
+                    value={adminPin}
+                    onChange={e => setAdminPin(e.target.value)}
+                    placeholder="Enter root passcode (e.g. 911999)"
+                    className="w-full px-4 py-3 rounded-2xl border border-amber-300 bg-white text-center font-mono text-base tracking-widest text-[#17343a] focus:outline-hidden focus:border-amber-500"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-teal-950 font-black text-xs uppercase tracking-wider shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all touch-manipulation active:scale-[0.98]"
+                >
+                  <Lock className="w-4 h-4" />
+                  <span>Verify Passcode &amp; Elevate Root</span>
+                </button>
+              </form>
+            </div>
+          )}
         </div>
 
         {/* Footer Info */}

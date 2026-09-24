@@ -112,8 +112,7 @@ export const UserModal: React.FC<UserModalProps> = ({
     if (verifySystemAdminPasscode(adminPassInput)) {
       setName(SYSTEM_ADMIN_PROFILE.name);
       setEmail(SYSTEM_ADMIN_PROFILE.email);
-      setEmployeeId(SYSTEM_ADMIN_PROFILE.employeeId || '12455');
-      setPhoneNumber(SYSTEM_ADMIN_PROFILE.phoneNumber || '+8801644440971');
+      setEmployeeId(SYSTEM_ADMIN_PROFILE.employeeId || 'SYS-ADMIN-01');
       setAssignedUnit(SYSTEM_ADMIN_PROFILE.assignedUnit || 'Debonair LTD (Unit-02) — Master Administration');
       setShift(SYSTEM_ADMIN_PROFILE.shift || '24/7 Root Operations & System Control');
       setSelectedTierId('tier_0');
